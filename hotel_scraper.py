@@ -4,7 +4,7 @@ import csv
 import re
 
 def scrape_hotel(url, hotel_name):
-    """Scrape hotel room data"""
+    """Scrape hotel room data from the website"""
     try:
         print(f"\nScraping {hotel_name}...")
         response = requests.get(url, timeout=10)
@@ -13,95 +13,94 @@ def scrape_hotel(url, hotel_name):
         
         rooms = []
         
-        # Strategy 1: Look for table rows
-        table_rows = soup.find_all('tr')
-        if len(table_rows) > 1:
-            for row in table_rows[1:]:  # Skip header
-                cells = row.find_all(['td', 'th'])
-                if len(cells) >= 2:
-                    try:
-                        rooms.append({
-                            'Hotel': hotel_name,
-                            'Room_Type': cells[0].get_text(strip=True),
-                            'Price': cells[1].get_text(strip=True),
-                            'Period': '20-30 December 2024'
-                        })
-                    except:
-                        continue
+        # Find all text content
+        all_text = soup.get_text()
+        lines = [line.strip() for line in all_text.split('\n') if line.strip()]
         
-        # Strategy 2: Look for divs/articles with class containing 'room' or 'card'
-        if not rooms:
-            room_divs = soup.find_all(['div', 'article'], class_=re.compile(r'room|card|item|product', re.I))
-            for div in room_divs[:15]:
-                try:
-                    name = div.find(['h1', 'h2', 'h3', 'h4', 'h5', 'p', 'span'])
-                    price_elem = div.find(string=re.compile(r'[\$€£]\s*\d+|price', re.I))
-                    
-                    if name and price_elem:
-                        rooms.append({
-                            'Hotel': hotel_name,
-                            'Room_Type': name.get_text(strip=True),
-                            'Price': price_elem.strip(),
-                            'Period': '20-30 December 2024'
-                        })
-                except:
-                    continue
-        
-        # Strategy 3: Search all text for price patterns
-        if not rooms:
-            all_text = soup.get_text()
-            lines = [line.strip() for line in all_text.split('\n') if line.strip()]
+        # Pattern to find hotel names and prices
+        for i, line in enumerate(lines):
+            # Look for euro prices
+            price_match = re.search(r'€\s*(\d+)', line)
             
-            for i, line in enumerate(lines):
-                if re.search(r'[\$€£]\s*\d+', line):
-                    # Look for room name in previous or same line
-                    room_name = lines[i-1] if i > 0 and not re.search(r'[\$€£]\s*\d+', lines[i-1]) else line.split('$')[0].strip()
-                    if room_name and len(room_name) > 2:
-                        rooms.append({
-                            'Hotel': hotel_name,
-                            'Room_Type': room_name[:50],
-                            'Price': line,
-                            'Period': '20-30 December 2024'
-                        })
-                        if len(rooms) >= 10:
+            if price_match:
+                price = '€ ' + price_match.group(1)
+                
+                # Find hotel name (usually 1-3 lines before price)
+                hotel_title = ''
+                for j in range(max(0, i-5), i):
+                    if len(lines[j]) > 10 and len(lines[j]) < 100:
+                        if not re.search(r'€\s*\d+', lines[j]):
+                            if re.search(r'[A-Z]', lines[j]):
+                                hotel_title = lines[j]
+                                break
+                
+                if not hotel_title:
+                    hotel_title = 'Unknown Hotel'
+                
+                # Find room type
+                room_type = 'Standard Room'
+                for j in range(max(0, i-3), min(len(lines), i+3)):
+                    if re.search(r'(King|Queen|Double|Twin|Suite|Studio|Room|Bed)', lines[j], re.I):
+                        if not re.search(r'€\s*\d+', lines[j]):
+                            room_type = lines[j]
                             break
+                
+                rooms.append({
+                    'Hotel': hotel_title[:60],
+                    'Room_Type': room_type[:50],
+                    'Price': price,
+                    'Period': '20-30 December 2025'
+                })
+                
+                if len(rooms) >= 40:
+                    break
         
-        print(f"Found {len(rooms)} rooms")
-        return rooms[:15]  # Limit to 15 rooms
+        print(f"Successfully scraped {len(rooms)} rooms from {hotel_name}")
+        return rooms
         
     except Exception as e:
         print(f"Error scraping {hotel_name}: {e}")
         return []
 
 def save_csv(data, filename='hotel_prices.csv'):
-    """Save data to CSV"""
+    """Save scraped data to CSV file"""
     try:
         with open(filename, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['Hotel', 'Room_Type', 'Price', 'Period'])
             writer.writeheader()
             writer.writerows(data)
-        print(f"\nSaved to {filename}")
+        print(f"\n" + "="*70)
+        print(f"SUCCESS! CSV file created: {filename}")
+        print(f"="*70)
         return True
     except Exception as e:
-        print(f"Error saving: {e}")
+        print(f"Error saving CSV: {e}")
         return False
 
-# Main execution
-print("=" * 50)
-print("Hotel Price Scraper")
-print("=" * 50)
+# MAIN EXECUTION
+print("="*70)
+print("HOTEL PRICE SCRAPER - December 20-30, 2025")
+print("="*70)
 
+# Target websites
 hotels = [
-    ('https://booking-hotels2.tiiny.site/', 'Booking Hotels 2'),
-    ('https://hotel1.tiiny.site', 'Hotel 1')
+    ('https://booking-hotels2.tiiny.site/', 'DublinStays'),
+    ('https://hotel1.tiiny.site', 'Luxe Haven')
 ]
 
 all_rooms = []
-for url, name in hotels:
-    all_rooms.extend(scrape_hotel(url, name))
 
+# Scrape each website
+for url, name in hotels:
+    rooms = scrape_hotel(url, name)
+    all_rooms.extend(rooms)
+
+# Save results to CSV
 if all_rooms:
     save_csv(all_rooms)
-    print(f"\nTotal rooms: {len(all_rooms)}")
+    print(f"\nTotal rooms in CSV: {len(all_rooms)}")
+    print(f"Period: 20-30 December 2025")
+    print(f"\nYou can now open 'hotel_prices.csv' in Excel!")
+    print("="*70)
 else:
-    print("\nNo data scraped! Please check if websites are accessible.")
+    print("\nNo data scraped! Check your internet connection.")

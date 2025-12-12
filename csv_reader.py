@@ -2,55 +2,85 @@ import csv
 from pathlib import Path
 
 def display_csv(filename='hotel_prices.csv'):
-    """Read and display CSV data"""
+    """Read and display CSV data with improved formatting"""
     try:
         if not Path(filename).exists():
             print(f"Error: {filename} not found!")
+            print(f"Please run hotel_scraper.py first to generate the CSV file.")
             return False
         
-        print("\n" + "=" * 80)
-        print("HOTEL ROOM PRICE COMPARISON")
-        print("=" * 80)
+        print("\n" + "=" * 90)
+        print("         HOTEL ROOM PRICE COMPARISON - December 20-30, 2025")
+        print("=" * 90)
         
         with open(filename, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             rows = list(reader)
         
         if not rows:
-            print("No data found!")
+            print("No data found in CSV!")
             return False
         
-        # Display table
-        print("\n{:<25} {:<30} {:<15} {:<20}".format("Hotel", "Room Type", "Price", "Period"))
-        print("-" * 90)
+        # Display table header
+        print("\n{:<35} {:<30} {:<15} {:<25}".format(
+            "HOTEL", "ROOM TYPE", "PRICE", "PERIOD"
+        ))
+        print("-" * 105)
         
-        for row in rows:
-            print("{:<25} {:<30} {:<15} {:<20}".format(
-                row['Hotel'][:25], 
-                row['Room_Type'][:30], 
-                row['Price'][:15], 
-                row['Period'][:20]
+        # Display each row
+        for i, row in enumerate(rows, 1):
+            print("{:<35} {:<30} {:<15} {:<25}".format(
+                row['Hotel'][:34], 
+                row['Room_Type'][:29], 
+                row['Price'][:14], 
+                row['Period'][:24]
             ))
         
-        # Summary
-        print("\n" + "=" * 80)
-        print(f"Total rooms: {len(rows)}")
+        # Summary statistics
+        print("\n" + "=" * 90)
+        print(f"SUMMARY:")
+        print(f"   Total rooms listed: {len(rows)}")
         
-        # Count by hotel
+        # Count by hotel/source
         hotels = {}
         for row in rows:
-            hotels[row['Hotel']] = hotels.get(row['Hotel'], 0) + 1
+            hotel_key = row['Hotel']
+            hotels[hotel_key] = hotels.get(hotel_key, 0) + 1
         
-        print("\nBy hotel:")
-        for hotel, count in hotels.items():
-            print(f"  {hotel}: {count} rooms")
+        print(f"   Unique hotels: {len(hotels)}")
         
-        print("=" * 80 + "\n")
+        # Show breakdown
+        print(f"\n   Breakdown by source:")
+        hotel_counts = sorted(hotels.items(), key=lambda x: x[1], reverse=True)
+        for hotel, count in hotel_counts[:10]:  # Show top 10
+            print(f"      - {hotel[:40]}: {count} rooms")
+        
+        if len(hotel_counts) > 10:
+            print(f"      ... and {len(hotel_counts) - 10} more hotels")
+        
+        # Price analysis (extract numeric values)
+        prices = []
+        for row in rows:
+            price_str = row['Price']
+            # Extract numbers from price string
+            import re
+            price_match = re.search(r'(\d+)', price_str.replace(',', ''))
+            if price_match:
+                prices.append(int(price_match.group(1)))
+        
+        if prices:
+            print(f"\n   Price Range:")
+            print(f"      - Minimum: EUR {min(prices)}")
+            print(f"      - Maximum: EUR {max(prices)}")
+            print(f"      - Average: EUR {sum(prices)//len(prices)}")
+        
+        print("=" * 90 + "\n")
         return True
         
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error reading CSV: {e}")
         return False
 
 # Main execution
-display_csv()
+if __name__ == "__main__":
+    display_csv()
